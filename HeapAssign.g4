@@ -1,22 +1,37 @@
 // Define a grammar called Hello
 grammar HeapAssign;
 
-prog  			: (statement ';')*;
+prog  			: statement*;
 
-statement		: expression '=' expression | 'if (' guard ') {' statement '}' 'else {' statement '}';
+statement		: assignment | if_branch ;
 
-expression		: constant | variable | variable + obj_property | exp '+' exp;
+assignment		: expression '=' expression ';';
+if_branch		:'if(' guard '){' statement* '}else{' statement* '}';
 
-obj_property 	: '[' exp ']' + obj_property;
+expression		: CONSTANT 
+				| VARIABLE 
+				| VARIABLE obj_property 
+				| concat
+				;
 
-exp 			: constant | variable | variable + obj_property;
+obj_property 	: ('[' expression ']' obj_property)*;
+concat			: '(' expression '+' expression ')';
 
-guard			: '(' grd '|' guard ')' | '(' grd '&' guard ')' | '!' guard;
+guard			: booling 
+				| equation 
+				| membership 
+				| nondeterministic 
+				| '(' guard '|' guard ')' 
+				| '(' guard '&' guard ')' 
+				| '!' guard
+				;
 
-grd 			: 'TRUE' | 'FALSE' | expression '==' expression | 'hasProp(' expression ',' expression ')' | '*';
+booling			: 'TRUE' | 'FALSE' ;
+equation		: expression '==' expression ;
+membership		: 'hasProp(' expression ',' expression ')' ;
+nondeterministic: '*' ;
 
-constant		: '\\"' [a-zA-Z_]+ '\\"';
 
-variable		: [a-zA-Z0-9]+;
-
+CONSTANT        : '"' ([A-Za-z0-9])+ '"';
+VARIABLE		: ([A-Za-z0-9])+;
 WS            	: [\t\r\n\f ]+ -> skip;
