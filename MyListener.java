@@ -5,16 +5,18 @@ import org.antlr.v4.runtime.tree.*;
 
 public class MyListener extends HeapAssignBaseListener{
 
-	private Map<String, String> VarToValues;
+	private Map<String, ArrayList<String>> VarToValues;
 	private Vector<Pair<String,String>> DataFlow;
 	private Pair<String, String> pair;
 	private ArrayList<String> variables;
+	private ArrayList<String> values;
     
     public MyListener() {
         VarToValues = new HashMap<>();
         DataFlow = new Vector<>();
         pair = new Pair<String,String>(null,null);
         variables = new ArrayList<String>();
+        values = new ArrayList<String>();
     }
 
 /*
@@ -82,13 +84,24 @@ public class MyListener extends HeapAssignBaseListener{
 		}
     }
 
+    private void valueUpdate(String left,String right){
+		values = VarToValues.get(left);
+		if(!(values==null))
+			if(!(VarToValues.get(right)==null))
+				values.addAll(VarToValues.get(right));
+		else
+			if(!(VarToValues.get(right)==null))
+				values = VarToValues.get(right);
+		VarToValues.put(left, values);    	
+    }
+
     private void AssignmentFrom(String left, HeapAssignParser.ExpressionContext right) {
 		if(right.getChildCount()==2){  //object property
 			String obj = right.VARIABLE().getText() + Obj_parse(right.obj_property());
 			if(VarToValues.get(obj) == null){
 				VarToValues.put(obj,null);
 			}
-			VarToValues.put(left, VarToValues.get(obj));
+			valueUpdate(left, obj);
 			pair = new Pair<>(left,obj);
 			DataFlow.addElement(pair);
 		}
@@ -98,14 +111,14 @@ public class MyListener extends HeapAssignBaseListener{
 				if(VarToValues.get(exp) == null){
 					VarToValues.put(exp,null);
 				}
-				VarToValues.put(left, VarToValues.get(exp));
+				valueUpdate(left, exp);
 				pair = new Pair<>(left,exp);
 				DataFlow.addElement(pair);
 			}
 			catch (NullPointerException e){}			
 			try{  //constant
 				String exp = right.CONSTANT().getText();
-				VarToValues.put(left, exp);
+				valueUpdate(left, exp);
 			}
 			catch (NullPointerException e){}
 			try{  //concat
