@@ -1,7 +1,8 @@
 a="apple";
 b="banana";
 a=b;
+c=a;
 x[a][y]="123";
 x["apple"][y]="456";
 x[a][y]=x[z];
-if(a==b){w=(w+"abc");b=c;}else{w=(w+"456");} 
+if(a==b){w=(w+"abc");b=c;}else{z=(z+"456");} 

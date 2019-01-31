@@ -84,15 +84,23 @@ public class MyListener extends HeapAssignBaseListener{
 		}
     }
 
+    //add a list of values in a variable
     private void valueUpdate(String left,String right){
-		values = VarToValues.get(left);
-		if(!(values==null))
-			if(!(VarToValues.get(right)==null))
-				values.addAll(VarToValues.get(right));
-		else
-			if(!(VarToValues.get(right)==null))
-				values = VarToValues.get(right);
+		values = new ArrayList<String>();
+		if(!(VarToValues.get(left)==null))
+			values.addAll(VarToValues.get(left));
+		if(!(VarToValues.get(right)==null))
+			values.addAll(VarToValues.get(right));
 		VarToValues.put(left, values);    	
+    }
+
+    //add a single value
+    private void valueAdd(String left,String exp){
+    	values = new ArrayList<String>();
+		if(!(VarToValues.get(left)==null))
+			values.addAll(VarToValues.get(left));
+		values.add(exp);
+		VarToValues.put(left,values);
     }
 
     private void AssignmentFrom(String left, HeapAssignParser.ExpressionContext right) {
@@ -118,14 +126,46 @@ public class MyListener extends HeapAssignBaseListener{
 			catch (NullPointerException e){}			
 			try{  //constant
 				String exp = right.CONSTANT().getText();
-				valueUpdate(left, exp);
+				valueAdd(left,exp);
 			}
 			catch (NullPointerException e){}
 			try{  //concat
+				ArrayList<String> tmp = new ArrayList<String>();
+				tmp = VarToValues.get(left);
 				HeapAssignParser.ExpressionContext exp1 = right.concat().expression(0);
 				HeapAssignParser.ExpressionContext exp2 = right.concat().expression(1);
 				AssignmentFrom(left,exp1);
 				AssignmentFrom(left,exp2);
+				VarToValues.put(left,tmp);
+
+				//record concat value to VarToValues
+				ArrayList<String> e1 = new ArrayList<String>();
+				ArrayList<String> e2 = new ArrayList<String>();
+
+				try{e1 = VarToValues.get(exp1.VARIABLE().getText());}
+				catch (NullPointerException e){}
+				try{e1.add(exp1.CONSTANT().getText());}
+				catch (NullPointerException e){}
+				try{e2 = VarToValues.get(exp2.VARIABLE().getText());}
+				catch (NullPointerException e){}
+				try{e2.add(exp2.CONSTANT().getText());}
+				catch (NullPointerException e){}
+
+				if (e1==null&&!(e2==null))
+					for (int i = 0; i < e2.size(); i++)
+						valueAdd(left,e2.get(i));
+				else if (!(e1==null)&&e2==null)
+					for (int i = 0; i < e1.size(); i++)
+						valueAdd(left,e1.get(i));
+				else if(!(e1==null)&&!(e2==null)){
+					ArrayList<String> mix = new ArrayList<String>();
+					for (int i = 0; i < e1.size(); i++)
+						for (int j = 0; j < e2.size(); j++){
+							mix.add(e1.get(i).substring(0,e1.get(i).length()-1)+e2.get(j).substring(1,e2.get(j).length()));
+						}
+					for (int i = 0; i < tmp.size(); i++)
+						valueAdd(left,mix.get(i));
+				}
 			}
 			catch (NullPointerException e){}
 		}  	
@@ -153,15 +193,15 @@ public class MyListener extends HeapAssignBaseListener{
 			for (int j = i+1; j < variables.size(); j++){
 				String[] var1 = (variables.get(i)).split("_");
 				String[] var2 = (variables.get(j)).split("_");
-				if(var1.length==var2.length){
+				if(var1.length==var2.length && !(var1.length==1)){
 					for(int k = 0; k < var1.length; k++){
-						if( !var1[k].equals(var2[k]) && !(isConstant(var1[k]) ^ isConstant(var2[k])) ){
+						if( !var1[k].equals(var2[k]) && (isConstant(var1[k]) && isConstant(var2[k])) ){
 							break;
 						}
 						if(k==var1.length-1){
 							pair = new Pair<>(variables.get(i),variables.get(j));
 							DataFlow.addElement(pair);
-							pair = new Pair<>(variables.get(j),variables.get(j));
+							pair = new Pair<>(variables.get(j),variables.get(i));
 							DataFlow.addElement(pair);
 						}
 					}
