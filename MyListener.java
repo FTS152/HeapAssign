@@ -1,7 +1,9 @@
 import java.util.*;
+import javafx.util.Pair;
 import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.misc.*;
 import org.antlr.v4.runtime.tree.*;
+import com.microsoft.z3.*;
 
 public class MyListener extends HeapAssignBaseListener{
 
@@ -17,6 +19,51 @@ public class MyListener extends HeapAssignBaseListener{
         pair = new Pair<String,String>(null,null);
         variables = new ArrayList<String>();
         values = new ArrayList<String>();
+    }
+
+    private void prove(Context ctx, BoolExpr f, boolean useMBQI){
+        BoolExpr[] assumptions = new BoolExpr[0];
+        prove(ctx, f, useMBQI, assumptions);
+    }
+
+    private void prove(Context ctx, BoolExpr f, boolean useMBQI,BoolExpr... assumptions){
+        System.out.println("Proving: " + f);
+        Solver s = ctx.mkSolver();
+        Params p = ctx.mkParams();
+        p.add("mbqi", useMBQI);
+        s.setParameters(p);
+        for (BoolExpr a : assumptions)
+            s.add(a);
+        s.add(ctx.mkNot(f));
+        Status q = s.check();
+
+        switch (q)
+        {
+        case UNKNOWN:
+            System.out.println("Unknown because: " + s.getReasonUnknown());
+            break;
+        case SATISFIABLE:
+            System.out.println("Check FAILED");
+            break;
+        case UNSATISFIABLE:
+            System.out.println("OK, proof: " + s.getProof());
+            break;
+        }
+    }
+
+    private void z3Check(){//z3 form
+
+    }
+
+    private ArrayList<String> flowCheck(String var){
+    	ArrayList<String> flow = new ArrayList<String>();
+    	Pair<String,String> cur;
+		for (int i = 0; i < DataFlow.size(); i++){
+			cur = DataFlow.get(i);
+			if(var.equals(cur.getKey()))
+				flow.add(cur.getValue());
+		}
+		return flow;
     }
 
 /*
@@ -195,9 +242,13 @@ public class MyListener extends HeapAssignBaseListener{
 				String[] var2 = (variables.get(j)).split("_");
 				if(var1.length==var2.length && !(var1.length==1)){
 					for(int k = 0; k < var1.length; k++){
+
+						//if var1 and var2 are constant
 						if( !var1[k].equals(var2[k]) && (isConstant(var1[k]) && isConstant(var2[k])) ){
 							break;
 						}
+
+						
 						if(k==var1.length-1){
 							pair = new Pair<>(variables.get(i),variables.get(j));
 							DataFlow.addElement(pair);
@@ -208,6 +259,8 @@ public class MyListener extends HeapAssignBaseListener{
 				}
 			}
 		}
+
+		System.out.println(flowCheck("a"));
 
 		System.out.println(VarToValues);
 		System.out.println(DataFlow);		
