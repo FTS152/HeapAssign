@@ -14,12 +14,17 @@ public class MyListener extends HeapAssignBaseListener{
 	private ArrayList<String> values;
     
     public MyListener() {
+    	//VarToValues: every possible data that a variable may store in the program
+    	//DataFlow: record which variable once flows its data to another variable(assignment)
+    	//variables: the list of all variables
         VarToValues = new HashMap<>();
         DataFlow = new Vector<>();
         pair = new Pair<String,String>(null,null);
         variables = new ArrayList<String>();
         values = new ArrayList<String>();
     }
+
+/*
 
     private void prove(Context ctx, BoolExpr f, boolean useMBQI){
         BoolExpr[] assumptions = new BoolExpr[0];
@@ -51,19 +56,46 @@ public class MyListener extends HeapAssignBaseListener{
         }
     }
 
-    private void z3Check(){//z3 form
-
+*/
+    //z3 form(not completed)
+    private Boolean z3Check(ArrayList<String> var1,ArrayList<String> var2){
+    	for (int i = 0; i < var1.size(); i++)
+    		for (int j = 0; j < var2.size(); j++)
+    			if (var1.get(i).equals(var2.get(j)))
+    				return true;
+    	return false;
     }
 
-    private ArrayList<String> flowCheck(String var){
+    //return variables(visit) that once flow to a certain variable(var)
+    private ArrayList<String> flowCheck(ArrayList<String> var,ArrayList<String> visit){
     	ArrayList<String> flow = new ArrayList<String>();
+    	Integer tmp = visit.size();
     	Pair<String,String> cur;
-		for (int i = 0; i < DataFlow.size(); i++){
-			cur = DataFlow.get(i);
-			if(var.equals(cur.getKey()))
-				flow.add(cur.getValue());
-		}
-		return flow;
+    	for(int i = 0; i < var.size(); i++){
+			for (int j = 0; j < DataFlow.size(); j++){
+				cur = DataFlow.get(j);
+
+				//only add variables that have not added to the visit list
+				if(var.get(i).equals(cur.getKey())){
+					Boolean visited = false;
+					for (int k = 0; k < visit.size(); k++)
+						if(visit.get(k).equals(cur.getValue()))
+							visited = true;
+					if(!visited){
+						flow.add(cur.getValue());
+						visit.add(cur.getValue());
+					}
+				}
+			}
+    	}
+
+    	//recursive call when some added variables are flowed by other variables
+    	if(tmp==visit.size()){
+    		return visit;
+    	}
+    	else{
+    		return flowCheck(flow,visit);
+    	}
     }
 
 /*
@@ -96,7 +128,7 @@ public class MyListener extends HeapAssignBaseListener{
 		}
 	}
 */
-
+	//parse object properties
 	private String Obj_parse(HeapAssignParser.Obj_propertyContext ctx){
 		if(ctx.obj_property(0).getChildCount()==0){
 			return '_' + ExpressionParse(ctx.expression(0));
@@ -106,6 +138,7 @@ public class MyListener extends HeapAssignBaseListener{
 		}
 	}
 
+	//parse variable and object expression
     private String ExpressionParse(HeapAssignParser.ExpressionContext ctx) {
 		if(ctx.getChildCount()==2){  //object property
 			String obj = ctx.VARIABLE().getText() + Obj_parse(ctx.obj_property());
@@ -131,7 +164,7 @@ public class MyListener extends HeapAssignBaseListener{
 		}
     }
 
-    //add a list of values in a variable
+    //add a list of values to a variable
     private void valueUpdate(String left,String right){
 		values = new ArrayList<String>();
 		if(!(VarToValues.get(left)==null))
@@ -150,6 +183,7 @@ public class MyListener extends HeapAssignBaseListener{
 		VarToValues.put(left,values);
     }
 
+    //parse variable, constant, object property and concat expression
     private void AssignmentFrom(String left, HeapAssignParser.ExpressionContext right) {
 		if(right.getChildCount()==2){  //object property
 			String obj = right.VARIABLE().getText() + Obj_parse(right.obj_property());
@@ -234,12 +268,19 @@ public class MyListener extends HeapAssignBaseListener{
 
 	@Override
 	public void exitProg(HeapAssignParser.ProgContext ctx) {
+		ArrayList<String> keys = new ArrayList<String>();
+		ArrayList<String> visit = new ArrayList<String>();
+		ArrayList<String> var1_flow = new ArrayList<String>();
+		ArrayList<String> var1_value = new ArrayList<String>();
+		ArrayList<String> var2_flow = new ArrayList<String>();
+		ArrayList<String> var2_value = new ArrayList<String>();
 		for (String key : VarToValues.keySet())
 			variables.add(key);
 		for (int i = 0; i < variables.size(); i++){
 			for (int j = i+1; j < variables.size(); j++){
 				String[] var1 = (variables.get(i)).split("_");
 				String[] var2 = (variables.get(j)).split("_");
+				//only consider the same depth of object properties
 				if(var1.length==var2.length && !(var1.length==1)){
 					for(int k = 0; k < var1.length; k++){
 
@@ -247,8 +288,44 @@ public class MyListener extends HeapAssignBaseListener{
 						if( !var1[k].equals(var2[k]) && (isConstant(var1[k]) && isConstant(var2[k])) ){
 							break;
 						}
+						//variable comparison, 
+						//var_flow is all poosible data flow to the variable, var_value is the corresponding values
+						if(!isConstant(var1[k])){
+							keys = new ArrayList<String>();
+							visit = new ArrayList<String>();
+							keys.add(var1[k]);
+							visit.add(var1[k]);
+							var1_flow = flowCheck(keys,visit);
+							var1_value = new ArrayList<String>();
+							for(int w = 0; w < var1_flow.size(); w++)
+								if (!(VarToValues.get(var1_flow.get(w))==null))
+									var1_value.addAll(VarToValues.get(var1_flow.get(w)));
+						}
+						else{
+							var1_value = new ArrayList<String>();
+							var1_value.add(var1[k]);
+						}
+						if(!isConstant(var2[k])){
+							keys = new ArrayList<String>();
+							visit = new ArrayList<String>();
+							keys.add(var2[k]);
+							visit.add(var2[k]);
+							var2_flow = flowCheck(keys,visit);
+							var2_value = new ArrayList<String>();
+							for(int w = 0; w < var2_flow.size(); w++)
+								if(!(VarToValues.get(var2_flow.get(w))==null))
+									var2_value.addAll(VarToValues.get(var2_flow.get(w)));
+						}
+						else{
+							var2_value = new ArrayList<String>();
+							var2_value.add(var2[k]);
+						}
 
+						//the two variable is proved to be different
+						if(!var1[k].equals(var2[k]) && !z3Check(var1_value,var2_value))
+							break;
 						
+						//have tested all properties
 						if(k==var1.length-1){
 							pair = new Pair<>(variables.get(i),variables.get(j));
 							DataFlow.addElement(pair);
@@ -259,8 +336,6 @@ public class MyListener extends HeapAssignBaseListener{
 				}
 			}
 		}
-
-		System.out.println(flowCheck("a"));
 
 		System.out.println(VarToValues);
 		System.out.println(DataFlow);		
