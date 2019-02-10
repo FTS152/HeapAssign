@@ -59,11 +59,35 @@ public class MyListener extends HeapAssignBaseListener{
 */
     //z3 form(not completed)
     private Boolean z3Check(ArrayList<String> var1,ArrayList<String> var2){
+    	if(var1.size()+var2.size()==0)
+    		return true;
     	for (int i = 0; i < var1.size(); i++)
     		for (int j = 0; j < var2.size(); j++)
     			if (var1.get(i).equals(var2.get(j)))
     				return true;
     	return false;
+    }
+
+    private ArrayList<String> flow_to_values(String var){
+    	ArrayList<String> keys = new ArrayList<String>();
+		ArrayList<String> visit = new ArrayList<String>();
+		keys.add(var);
+		visit.add(var);
+		ArrayList<String> var_flow = flowCheck(keys,visit);
+		ArrayList<String> var_value = new ArrayList<String>();
+		for(int i = 0; i < var_flow.size(); i++)
+			if (!(VarToValues.get(var_flow.get(i))==null))
+					var_value.addAll(VarToValues.get(var_flow.get(i)));
+		return var_value;
+    }
+
+    private ArrayList<String> concat_to_values(String var,String con){
+    	ArrayList<String> var_value = flow_to_values(var);
+		for (int i = 0; i < var_value.size(); i++)
+			var_value.set(i,var_value.get(i)+con.substring(1,con.length()));
+		if(var_value.size()==0)
+			var_value.add(con);
+		return var_value;
     }
 
     //return variables(visit) that once flow to a certain variable(var)
@@ -148,7 +172,7 @@ public class MyListener extends HeapAssignBaseListener{
 			return obj;
 		}
 		else{
-			String exp = null;
+			String exp = null, exp1, exp2;
 			try{  //variable
 				exp = ctx.VARIABLE().getText();
 				if(VarToValues.get(exp) == null){
@@ -158,6 +182,12 @@ public class MyListener extends HeapAssignBaseListener{
 			catch (NullPointerException e){}			
 			try{  //constant
 				exp = ctx.CONSTANT().getText();
+			}
+			catch (NullPointerException e){}
+			try{  //concat
+				exp1 =  ExpressionParse(ctx.concat().expression(0));
+				exp2 =  ExpressionParse(ctx.concat().expression(1));
+				exp = exp1 + "+" + exp2;
 			}
 			catch (NullPointerException e){}
 			return  exp;
@@ -268,11 +298,7 @@ public class MyListener extends HeapAssignBaseListener{
 
 	@Override
 	public void exitProg(HeapAssignParser.ProgContext ctx) {
-		ArrayList<String> keys = new ArrayList<String>();
-		ArrayList<String> visit = new ArrayList<String>();
-		ArrayList<String> var1_flow = new ArrayList<String>();
 		ArrayList<String> var1_value = new ArrayList<String>();
-		ArrayList<String> var2_flow = new ArrayList<String>();
 		ArrayList<String> var2_value = new ArrayList<String>();
 		for (String key : VarToValues.keySet())
 			variables.add(key);
@@ -291,30 +317,28 @@ public class MyListener extends HeapAssignBaseListener{
 						//variable comparison, 
 						//var_flow is all poosible data flow to the variable, var_value is the corresponding values
 						if(!isConstant(var1[k])){
-							keys = new ArrayList<String>();
-							visit = new ArrayList<String>();
-							keys.add(var1[k]);
-							visit.add(var1[k]);
-							var1_flow = flowCheck(keys,visit);
-							var1_value = new ArrayList<String>();
-							for(int w = 0; w < var1_flow.size(); w++)
-								if (!(VarToValues.get(var1_flow.get(w))==null))
-									var1_value.addAll(VarToValues.get(var1_flow.get(w)));
+							if(var1[k].split("\\+").length>1){
+								if(!isConstant(var1[k].split("\\+")[0]))
+									var1_value = concat_to_values(var1[k].split("\\+")[0],var1[k].split("\\+")[1]);
+								else
+									var1_value = concat_to_values(var1[k].split("\\+")[1],var1[k].split("\\+")[0]);
+							}
+							else
+								var1_value = flow_to_values(var1[k]);
 						}
 						else{
 							var1_value = new ArrayList<String>();
 							var1_value.add(var1[k]);
 						}
 						if(!isConstant(var2[k])){
-							keys = new ArrayList<String>();
-							visit = new ArrayList<String>();
-							keys.add(var2[k]);
-							visit.add(var2[k]);
-							var2_flow = flowCheck(keys,visit);
-							var2_value = new ArrayList<String>();
-							for(int w = 0; w < var2_flow.size(); w++)
-								if(!(VarToValues.get(var2_flow.get(w))==null))
-									var2_value.addAll(VarToValues.get(var2_flow.get(w)));
+							if(var2[k].split("\\+").length>1){
+								if(!isConstant(var2[k].split("\\+")[0]))
+									var2_value = concat_to_values(var2[k].split("\\+")[0],var2[k].split("\\+")[1]);
+								else
+									var2_value = concat_to_values(var2[k].split("\\+")[1],var2[k].split("\\+")[0]);
+							}
+							else
+								var2_value = flow_to_values(var2[k]);
 						}
 						else{
 							var2_value = new ArrayList<String>();
